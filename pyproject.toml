@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fleet-gateway"
+version = "0.1.0"
+description = "Unified API gateway for the Pelagic fleet — single HTTP entry point with service discovery, auth, rate limiting, and routing."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+keywords = ["gateway", "fleet", "api", "proxy", "microservices"]
+
+[project.scripts]
+fleet-gateway = "cli:main"
+
+[tool.setuptools.packages.find]
+include = ["*.py"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
