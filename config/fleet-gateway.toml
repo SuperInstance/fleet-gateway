@@ -1,0 +1,60 @@
+# Fleet Gateway Configuration
+# Keys can also be provided via environment variables:
+#   FLEET_GATEWAY__PROVIDERS__DEEPINFRA__KEYS (comma-separated)
+#   FLEET_GATEWAY__PROVIDERS__DEEPSEEK__KEYS
+#   FLEET_GATEWAY__PROVIDERS__ZAI__KEYS
+
+[server]
+listen = "127.0.0.1:8787"
+
+[circuit_breaker]
+failure_threshold = 5      # consecutive failures before opening
+cooldown_secs = 60         # time before half-open probe
+success_threshold = 2      # successes in half-open before closing
+
+[rate_limit]
+max_retries = 2            # max retries on 429 before falling through
+initial_backoff_ms = 500   # initial backoff for rate limits
+
+# ─── DeepInfra ──────────────────────────────────────────────────────────────
+[providers.deepinfra]
+base_url = "https://api.deepinfra.com/v1/openai"
+keys = ["zYuVMGC4JySULP2waqKW35jI42TjaPkl"]
+models = [
+  "Qwen/Qwen3-TTS-VoiceDesign",
+  "google/gemma-4-26B-A4B-it",
+  "Qwen/Qwen3-VL-235B",
+  "Qwen/Qwen3-Coder-480B",
+  "ByteDance/Seed-2.0-mini",
+  "ByteDance/Seed-2.0-pro",
+  "nvidia/Nemotron-3-Ultra-550B",
+  "NousResearch/Hermes-3-Llama-3.1-405B",
+  "black-forest-labs/FLUX-2-max",
+  "stabilityai/sdxl-turbo",
+  "BAAI/bge-m3",
+]
+
+# ─── DeepSeek (direct API) ──────────────────────────────────────────────────
+[providers.deepseek]
+base_url = "https://api.deepseek.com/v1"
+# Read from environment at startup; fallback to bashrc key
+keys = ["sk-0a57cd44bc674f5caffd9b0ec10e284c"]
+models = ["deepseek-chat", "deepseek-reasoner"]
+
+# ─── Z.ai (GLM) ─────────────────────────────────────────────────────────────
+[providers.zai]
+base_url = "https://api.z.ai/api/paas/v4"
+# Set via environment: FLEET_GATEWAY__PROVIDERS__ZAI__KEYS or ZAI_API_KEY
+keys = []
+models = ["glm-5.2", "glm-4.6", "glm-4.5-air"]
+
+# ─── Ollama (local fallback) ────────────────────────────────────────────────
+[providers.ollama]
+base_url = "http://localhost:11434/v1"
+keys = []
+models = ["granite3.1-dense:2b", "nomic-embed-text"]
+
+# ─── Provider Chain Order ───────────────────────────────────────────────────
+# First healthy provider wins. Gateway walks this list on each request.
+[chain]
+order = ["deepinfra", "deepseek", "zai", "ollama"]
