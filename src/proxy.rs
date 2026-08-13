@@ -247,7 +247,7 @@ async fn stream_response(upstream: reqwest::Response) -> Response {
     let body = Body::from_stream(stream);
 
     let mut response = Response::builder().status(status);
-    response.headers_mut().map(|h| h.extend(headers));
+    if let Some(h) = response.headers_mut() { h.extend(headers); }
 
     response.body(body).unwrap_or_else(|_| {
         Response::builder()
