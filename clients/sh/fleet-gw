@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# fleet-gw — curl wrapper for the Fleet Gateway (shell one-off, FAIL-CLOSED).
+#
+# Usage:
+#   fleet-gw chat <model> <message>    POST /v1/chat/completions, print reply
+#   fleet-gw health                    GET /health, pretty-print breaker state
+#
+# On gateway down: clear error to stderr, non-zero exit. (Unlike the Python
+# shim, which fails open — shell one-offs may fail closed.)
+
+set -euo pipefail
+
+GW="${FLEET_GATEWAY_URL:-http://127.0.0.1:8787}"
+
+cmd="${1:-}"
+case "$cmd" in
+  chat)
+    model="${2:?usage: fleet-gw chat <model> <message>}"
+    msg="${3:?usage: fleet-gw chat <model> <message>}"
+    # Build JSON safely (handles quotes/newlines in the message).
+    payload="$(python3 - "$model" "$msg" <<'PY'
+import json, sys
+print(json.dumps({
+    "model": sys.argv[1],
+    "messages": [{"role": "user", "content": sys.argv[2]}],
+    "max_tokens": 1024,
+}))
+PY
+)"
+    body="$(curl -sS --connect-timeout 2 --max-time 120 \
+        -H 'Content-Type: application/json' \
+        -d "$payload" \
+        -w '\n%{http_code}' \
+        "$GW/v1/chat/completions")" || {
+        echo "fleet-gw: gateway unreachable at $GW (is fleet-gateway running?)" >&2
+        exit 2
+    }
+    status="${body##*$'\n'}"
+    content="${body%$'\n'*}"
+    if [ "$status" != "200" ]; then
+        echo "fleet-gw: gateway returned HTTP $status" >&2
+        echo "$content" >&2
+        exit 1
+    fi
+    # Extract the assistant reply (first choice).
+    python3 -c '
+import json, sys
+try:
+    r = json.loads(sys.stdin.read())
+    c = r["choices"][0]["message"]["content"]
+    print(c if isinstance(c, str) else "".join(
+        p.get("text", "") for p in c if isinstance(p, dict)))
+except Exception as e:
+    print(f"fleet-gw: unexpected response shape: {e}", file=sys.stderr)
+    sys.exit(1)
+' <<<"$content"
+    ;;
+
+  health)
+    body="$(curl -sS --connect-timeout 2 --max-time 10 \
+        -w '\n%{http_code}' \
+        "$GW/health")" || {
+        echo "fleet-gw: gateway unreachable at $GW (is fleet-gateway running?)" >&2
+        exit 2
+    }
+    status="${body##*$'\n'}"
+    content="${body%$'\n'*}"
+    if [ "$status" != "200" ]; then
+        echo "fleet-gw: gateway returned HTTP $status for /health" >&2
+        exit 1
+    fi
+    python3 -m json.tool <<<"$content"
+    ;;
+
+  *)
+    echo "usage: fleet-gw chat <model> <message> | fleet-gw health" >&2
+    exit 64
+    ;;
+esac
