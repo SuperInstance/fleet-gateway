@@ -4,6 +4,8 @@
 
 > *Every request walks the chain. Every provider gets one chance. Every key earns its keep.*
 
+![Fleet Gateway — the engine room switchboard](assets/hero_001.jpg)
+
 ---
 
 ## Table of Contents
